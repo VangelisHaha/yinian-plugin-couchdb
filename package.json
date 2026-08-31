@@ -1,0 +1,22 @@
+{
+  "name": "yinian-plugin-couchdb",
+  "version": "0.1.0",
+  "description": "一念多端同步的 CouchDB 传输后端（replica 扩展点）",
+  "type": "module",
+  "private": true,
+  "engines": {
+    "node": ">=20"
+  },
+  "scripts": {
+    "build": "tsc",
+    "typecheck": "tsc --noEmit",
+    "doctor": "node scripts/doctor.mjs",
+    "test": "npm run build && node --test \"tests/**/*.test.mjs\"",
+    "verify": "npm run build && npm run doctor && node --test \"tests/**/*.test.mjs\"",
+    "pack": "npm run build && node scripts/pack.mjs"
+  },
+  "devDependencies": {
+    "@types/node": "^22.15.3",
+    "typescript": "5.9.2"
+  }
+}
