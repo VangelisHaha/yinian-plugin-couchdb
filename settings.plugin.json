@@ -1,0 +1,60 @@
+{
+  "scope": "plugin",
+  "fields": [
+    {
+      "key": "intro",
+      "type": "note",
+      "label": "说明",
+      "text": "这是**多端同步的传输后端**：一念把变更加密之后交给它，它只负责把字节搬到你的 CouchDB。**它看不懂内容**——远端存的是密文，CouchDB 管理员也读不到你的任务标题。\n\n加密口令在「设置 → 多端同步」里输入，**不存在这里、也不会同步**。"
+    },
+    {
+      "key": "endpoint",
+      "type": "string",
+      "format": "url",
+      "label": "CouchDB 地址",
+      "placeholder": "https://couch.example.com:6984",
+      "required": true,
+      "help": "带协议与端口的根地址，不要带数据库名。**强烈建议用 https**：http 下 Basic Auth 的账号密码在链路上是明文（同步内容本身已端到端加密，但凭据不是）。"
+    },
+    {
+      "key": "database",
+      "type": "string",
+      "label": "数据库名",
+      "default": "yinian_sync",
+      "required": true,
+      "help": "不存在时会自动创建。CouchDB 要求小写字母开头（形状校验在保存时做，见 config.validate）。多个用途共用一台 CouchDB 时用不同库名隔开。"
+    },
+    {
+      "key": "username",
+      "type": "string",
+      "label": "用户名",
+      "required": true,
+      "help": "需要对该数据库的读写权限。CouchDB 3 默认不允许匿名写入。"
+    },
+    {
+      "key": "password",
+      "type": "string",
+      "format": "secret",
+      "label": "密码",
+      "required": true,
+      "help": "存在本机的加密配置里，永不回显、日志自动脱敏。"
+    },
+    {
+      "key": "timeoutSeconds",
+      "type": "integer",
+      "label": "请求超时",
+      "default": 30,
+      "min": 5,
+      "max": 60,
+      "unit": "seconds",
+      "help": "自建机器慢或走跨境链路时可以调大。上限 60 秒——宿主对 put/get 的超时就是 60 秒，设得比它大没有意义。"
+    },
+    {
+      "key": "testConnection",
+      "type": "action",
+      "label": "测试连接",
+      "rpc": "couchdb.testConnection",
+      "help": "验证地址、账号密码与数据库是否可用。数据库不存在时会尝试创建。"
+    }
+  ]
+}

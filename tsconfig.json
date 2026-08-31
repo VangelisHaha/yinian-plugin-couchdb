@@ -1,0 +1,21 @@
+{
+  "compilerOptions": {
+    // 插件跑在宿主的 Node 子进程里（manifest 声明 node >=20），
+    // 输出必须是原生 ESM：宿主直接 `node dist/main.mjs`，不经打包器
+    "target": "ES2023",
+    "module": "NodeNext",
+    "moduleResolution": "NodeNext",
+    "outDir": "dist",
+    "rootDir": "src",
+    "strict": true,
+    "noUncheckedIndexedAccess": true,
+    "exactOptionalPropertyTypes": true,
+    "noImplicitOverride": true,
+    "noFallthroughCasesInSwitch": true,
+    "declaration": false,
+    "sourceMap": false,
+    "skipLibCheck": true,
+    "types": ["node"]
+  },
+  "include": ["src/**/*.mts"]
+}
