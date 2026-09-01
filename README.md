@@ -2,9 +2,15 @@
 
 一念（Yinian）**多端同步**的传输后端：把一念加密后的字节搬到你自己的 CouchDB。
 
+- 插件 id：`yinian-couchdb`（仓库名带 `plugin-`，manifest id 不带——与其他一念插件一致）
 - 扩展点：`replica`（一念 `docs/11-plugin-architecture.md` §5.4）
 - 时效：**轮询**（当前版本 `capabilities.watch = false`，见下面「实时同步」）
 - 需要：一台你能访问的 CouchDB 3.x
+
+> **从 0.1.0 升级要重装。** 0.2.0 把 manifest id 从 `yinian-plugin-couchdb` 改成
+> `yinian-couchdb`（对齐其他插件的命名）。宿主按 id 认插件，所以它不是「升级」而是
+> 「换了一个插件」：先卸载旧的、装新的、重填连接配置，再去「设置 → 多端同步」把配置
+> 指向新后端。**远端数据不受影响**，加密口令也还在系统钥匙串里。
 
 ## 它做什么，不做什么
 

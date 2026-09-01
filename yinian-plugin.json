@@ -1,8 +1,8 @@
 {
   "manifestVersion": 1,
-  "id": "yinian-plugin-couchdb",
+  "id": "yinian-couchdb",
   "name": "自建 CouchDB 同步",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "author": "vangelis",
   "description": "多端同步的传输后端：把一念加密后的字节搬到你自己的 CouchDB。只搬字节，看不懂内容。",
   "homepage": "https://github.com/VangelisHaha/yinian-plugin-couchdb",
@@ -15,7 +15,9 @@
     }
   },
   "permissions": {
-    "net": ["*"],
+    "net": [
+      "*"
+    ],
     "spawn": [],
     "fs": [],
     "api": []
@@ -30,7 +32,11 @@
         "maxObjectBytes": 4194304
       }
     },
-    "settingsPanel": ["settings.plugin.json"]
+    "settingsPanel": [
+      "settings.plugin.json"
+    ]
   },
-  "authMode": ["basic"]
+  "authMode": [
+    "basic"
+  ]
 }
