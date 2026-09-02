@@ -15,6 +15,7 @@ import { fileURLToPath } from "node:url";
 import { start } from "./sdk/index.mjs";
 import * as config from "./handlers/config.mjs";
 import * as replica from "./handlers/replica.mjs";
+import * as watch from "./handlers/watch.mjs";
 
 /** 版本只维护在 manifest 一处，避免和 package.json 漂移。 */
 function readManifestVersion(): string {
@@ -37,6 +38,9 @@ start({
     "replica.get": replica.get,
     "replica.list": replica.list,
     "replica.delete": replica.remove,
+    // 实时订阅：没有它，接收侧只能按间隔轮询——发送侧再快也没用，接收侧才是瓶颈
+    "replica.watch": watch.watch,
+    "replica.unwatch": watch.unwatch,
 
     // 配置
     "config.validate": config.validate,
