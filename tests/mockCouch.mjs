@@ -27,6 +27,10 @@ const PASS = "secret-pass";
 export async function startMockCouch() {
   /** db 名 → (docId → doc)。doc 形如 { _id, _rev, b, s, _deleted } */
   const databases = new Map();
+  /** 每个库的变更序号，写一次 +1。真实 CouchDB 按文档算，这里够用。 */
+  const seqs = new Map();
+  const seq = (dbName) => seqs.get(dbName) ?? 0;
+  const bumpSeq = (dbName) => seqs.set(dbName, seq(dbName) + 1);
 
   const server = createServer((req, res) => {
     const send = (status, body) => {
@@ -70,13 +74,26 @@ export async function startMockCouch() {
         return;
       }
       const alive = [...db.values()].filter((doc) => !doc._deleted);
-      send(200, { db_name: dbName, doc_count: alive.length });
+      send(200, { db_name: dbName, doc_count: alive.length, update_seq: String(seq(dbName)) });
       return;
     }
 
     const db = databases.get(dbName);
     if (!db) {
       send(404, { error: "not_found", reason: "no_db_file" });
+      return;
+    }
+
+    // GET /{db}/_changes —— longpoll。mock 不真挂住：把「自 since 之后写过的 id」
+    // 立刻返回，测试要的是协议形状与调用方的处理，不是等待行为本身。
+    if (req.method === "GET" && action === "_changes") {
+      const since = Number(url.searchParams.get("since") ?? "0");
+      const current = seq(dbName);
+      const results =
+        current > since
+          ? [...db.keys()].map((id) => ({ id, seq: String(current) }))
+          : [];
+      send(200, { results, last_seq: String(current) });
       return;
     }
 
@@ -106,6 +123,7 @@ export async function startMockCouch() {
           db.set(doc._id, { ...doc, _rev: rev, _deleted: false });
           return { id: doc._id, ok: true, rev };
         });
+        if (rows.some((row) => row.ok)) bumpSeq(dbName);
         send(201, rows);
         return;
       }

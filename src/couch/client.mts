@@ -182,8 +182,75 @@ export class CouchClient {
     }
   }
 
-  /** 把 CouchDB 的错误体转成给用户看的一句话。**只取状态码与 reason**。 */
-  private fail(status: number, json: unknown): CouchError {
+  /**
+   * 等一批变更（`_changes?feed=longpoll`）。
+   *
+   * **用 longpoll 而不是 continuous**：continuous feed 被频繁中断会泄漏服务端资源
+   * （apache/couchdb#1063），而插件进程会因超时被杀、网络会抖，重连频率不低——
+   * 自建的树莓派 / 小 VPS 会被打到 CPU 满。longpoll 的延迟一样是亚秒级。
+   *
+   * 返回 `null` 表示这一轮没等到变更（到了 `timeoutMs` 上限）。调用方据此继续下一轮，
+   * 顺便发一次心跳。
+   *
+   * **不复用 [`request`]**：那个方法的超时是给普通请求用的（默认几十秒），而这里要
+   * 主动挂住等变更，两者的超时语义正好相反。
+   */
+  async waitForChanges(
+    since: string,
+    timeoutMs: number,
+    abort: AbortSignal,
+  ): Promise<{ lastSeq: string; ids: string[] } | null> {
+    // heartbeat 让 CouchDB 周期性发一个空行，这样连接不会被中间的代理判成空闲掉线
+    const url = this.dbUrl(
+      `/_changes?feed=longpoll&since=${encodeURIComponent(since)}` +
+        `&timeout=${timeoutMs}&heartbeat=${Math.min(timeoutMs, 30_000)}`,
+    );
+    let response: Response;
+    try {
+      response = await fetch(url, {
+        method: "GET",
+        headers: { Authorization: this.authHeader(), Accept: "application/json" },
+        signal: abort,
+      });
+    } catch (error) {
+      if (error instanceof Error && error.name === "AbortError") return null;
+      throw new CouchError("订阅远端变更失败：连不上远端");
+    }
+    const text = await response.text();
+    if (!response.ok) {
+      throw new CouchError(`订阅远端变更失败（HTTP ${response.status}）`, response.status);
+    }
+    let json: { last_seq?: unknown; results?: unknown };
+    try {
+      json = JSON.parse(text) as typeof json;
+    } catch {
+      // longpoll 超时后 CouchDB 也回一个合法 JSON，解析不了说明中间有代理在挡
+      throw new CouchError("订阅远端变更失败：远端返回了非 JSON 响应");
+    }
+    const lastSeq = typeof json.last_seq === "string" ? json.last_seq : since;
+    const results = Array.isArray(json.results) ? json.results : [];
+    const ids = results
+      .map((row) =>
+        row && typeof row === "object" && "id" in row
+          ? String((row as { id?: unknown }).id ?? "")
+          : "",
+      )
+      .filter((id) => id.length > 0);
+    return { lastSeq, ids };
+  }
+
+  /** 当前的变更序号，用来作为订阅起点。 */
+  async currentSeq(): Promise<string> {
+    const { status, json } = await this.request("GET", this.dbUrl());
+    if (status !== 200) throw this.fail(status, json);
+    const seq =
+      json && typeof json === "object" && "update_seq" in json
+        ? (json as { update_seq?: unknown }).update_seq
+        : undefined;
+    return typeof seq === "string" ? seq : "0";
+  }
+
+  /** 把 CouchDB 的错误体转成给用户看的一句话。**只取状态码与 reason**。 */  private fail(status: number, json: unknown): CouchError {
     const reason =
       json && typeof json === "object" && "reason" in json
         ? String((json as { reason?: unknown }).reason ?? "")
