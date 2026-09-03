@@ -201,25 +201,49 @@ export class CouchClient {
     timeoutMs: number,
     abort: AbortSignal,
   ): Promise<{ lastSeq: string; ids: string[] } | null> {
-    // **不要同时给 heartbeat 和 timeout。** CouchDB 里 heartbeat 优先、timeout 被忽略，
-    // 于是连接永不超时——而我们靠「超时返回」来发心跳、也靠它在订阅出问题时自愈。
-    // 踩过一次：加了 heartbeat 之后 longpoll 一次都没返回过（连超时都没有），
-    // 实时订阅看起来建立成功、实际什么都收不到。
+    // **等待上限由客户端控制，不依赖服务端的 `timeout` 参数。** 两条都踩过：
+    //
+    // 1. 同时给 `heartbeat` 和 `timeout` 时，CouchDB 里 heartbeat 优先、timeout 被
+    //    忽略，连接永不超时；
+    // 2. 只给 `timeout` 也不一定生效（实测 55s 的 longpoll 两个周期都没返回，中间的
+    //    反向代理与服务端配置都可能吃掉它）。
+    //
+    // 两种情况的现象一模一样、而且极具欺骗性：`watch` 调用成功、连接 ESTABLISHED、
+    // 插件活着、一条错误都没有，而宿主永远收不到通知——实时订阅静默失效。
+    //
+    // 所以改成 `AbortSignal.timeout` 自己掐：到点主动断开，抛 AbortError 走「本轮无
+    // 变更」的路径，发心跳后重新发起。服务端的 `timeout` 参数照旧带上（谁先到算谁），
+    // 但正确性不再依赖它。
     const url = this.dbUrl(
       `/_changes?feed=longpoll&since=${encodeURIComponent(since)}&timeout=${timeoutMs}`,
     );
     let response: Response;
+    // 外部 abort（unwatch）与自己的超时合成一个：两者都该结束这一轮
+    const deadline = AbortSignal.timeout(timeoutMs + 5_000);
+    const signal = AbortSignal.any([abort, deadline]);
     try {
       response = await fetch(url, {
         method: "GET",
         headers: { Authorization: this.authHeader(), Accept: "application/json" },
-        signal: abort,
+        signal,
       });
     } catch (error) {
-      if (error instanceof Error && error.name === "AbortError") return null;
+      // 超时与外部取消都返回 null = 「这一轮没等到变更」，调用方发心跳后重来
+      if (error instanceof Error && (error.name === "AbortError" || error.name === "TimeoutError")) {
+        return null;
+      }
       throw new CouchError("订阅远端变更失败：连不上远端");
     }
-    const text = await response.text();
+    let text: string;
+    try {
+      text = await response.text();
+    } catch (error) {
+      // 响应头到了但 body 挂住——同样按「本轮无变更」处理，别让它卡死循环
+      if (error instanceof Error && (error.name === "AbortError" || error.name === "TimeoutError")) {
+        return null;
+      }
+      throw new CouchError("订阅远端变更失败：读取响应中断");
+    }
     if (!response.ok) {
       throw new CouchError(`订阅远端变更失败（HTTP ${response.status}）`, response.status);
     }

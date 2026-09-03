@@ -26,8 +26,30 @@
 import { logger, replicaChanged, replicaHeartbeat } from "../sdk/index.mjs";
 import { CouchClient, readConfig } from "../couch/client.mjs";
 
-/** longpoll 单轮最多挂多久。到点没变更就返回，顺便发一次心跳。 */
-const POLL_TIMEOUT_MS = 55_000;
+/**
+ * longpoll 单轮最多挂多久。到点没变更就丢下这次请求、重新发起，顺便发一次心跳。
+ *
+ * **20 秒而不是 55 秒**：这个值同时是「订阅出问题后多久自愈」的上限，短一点更稳。
+ * 代价是没有变更时每 20 秒重连一次——对自建的小机器仍然可以忽略（一次 `_changes`
+ * 查询很轻）。
+ *
+ * ## 未解问题（真实环境上观察到，两处都已加防线但根因没定位）
+ *
+ * 在作者的环境（CouchDB 前面有一层反向代理 / 隧道）上：
+ *
+ * 1. **服务端的 `timeout` 参数不生效**，longpoll 挂起等待时永不返回；
+ * 2. **`AbortSignal.timeout` 也没能中断那次 fetch**（响应头还没到）；
+ * 3. 加了 `Promise.race` 兜底之后，**连 `setTimeout` 都没让循环推进**——最可能是插件
+ *    的 stdout 写入被阻塞（Node 在管道缓冲满、对端不读时会同步写、卡住事件循环），
+ *    但没有确证。
+ *
+ * 有变更时 CouchDB 能立刻返回（已验证），所以订阅在「刚建立且远端已有新对象」时是
+ * 工作的；卡住的是「挂起等待新变更」这一段。
+ *
+ * **这不影响正确性**：一念的轮询兜底一直留着（`docs/14` §8.4），订阅只是加速，
+ * 断了只会变慢不会丢数据。要更快可以把同步间隔调到 1 分钟。
+ */
+const POLL_TIMEOUT_MS = 20_000;
 
 /** 出错后的重试退避（毫秒），逐次递增到上限。 */
 const RETRY_BACKOFF_MS = [1_000, 5_000, 15_000, 60_000];
@@ -107,10 +129,29 @@ async function loop(
   let failures = 0;
   while (!signal.aborted && subscriptions.get(params.profileId)?.generation === generation) {
     try {
-      const batch = await client.waitForChanges(since, POLL_TIMEOUT_MS, signal);
+      // **循环的推进不依赖 fetch 的行为。**
+      //
+      // 实测过：这个环境下 longpoll 挂起等待时永不返回——服务端的 `timeout` 参数不生效，
+      // `AbortSignal.timeout` 也没能中断它（响应头都还没到）。而现象极具欺骗性：
+      // 连接 ESTABLISHED、插件活着、一条错误都没有，循环却永久卡在一次 fetch 上，
+      // 于是心跳停了、订阅再也不自愈。
+      //
+      // 所以用 `Promise.race` 自己掐一个上限：到点就丢下那次请求（abort 清理连接）
+      // 继续下一轮。**这不影响实时性**——有变更时 CouchDB 会立刻返回（已验证），
+      // 挂起只发生在没有变更的时候，那时本来就不需要低延迟。
+      const attempt = new AbortController();
+      const linked = () => attempt.abort();
+      signal.addEventListener("abort", linked, { once: true });
+      const batch = await Promise.race([
+        client.waitForChanges(since, POLL_TIMEOUT_MS, attempt.signal),
+        sleep(POLL_TIMEOUT_MS, signal).then(() => {
+          attempt.abort();
+          return null;
+        }),
+      ]);
+      signal.removeEventListener("abort", linked);
       if (signal.aborted) break;
       failures = 0;
-
       if (batch === null) {
         // 这一轮没等到变更：发心跳让宿主知道订阅还活着
         replicaHeartbeat({ profileId: params.profileId, cursor: since });
