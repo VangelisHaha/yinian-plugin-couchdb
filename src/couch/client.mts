@@ -266,8 +266,19 @@ export class CouchClient {
     return { lastSeq, ids };
   }
 
-  /** 当前的变更序号，用来作为订阅起点。 */
+  /**
+   * 当前的变更序号，用来作为订阅起点。
+   *
+   * **要先确保库存在。** 订阅是在「第一次 put 之前」就可能被建立的（宿主每轮同步开头就
+   * 幂等地调一次 `watch`），此时远端还是空的、库还没被建出来 → `GET /{db}` 回 404 →
+   * 起点取不到 → 订阅循环**直接退出**，而且退出时把自己的登记也删了。
+   *
+   * 现象很隐蔽：`watch` 明明回了 `watching: true`，宿主也没报错，但一个心跳都收不到，
+   * 于是宿主每轮都判它已死、反复重建。这条是被「没有变更的那一轮要发心跳」那个测试
+   * 逼出来的。
+   */
   async currentSeq(): Promise<string> {
+    await this.ensureDatabase();
     const { status, json } = await this.request("GET", this.dbUrl());
     if (status !== 200) throw this.fail(status, json);
     const seq =
@@ -406,13 +417,23 @@ export class CouchClient {
    * 拿它当 startkey 就等于「> since」。
    *
    * 多取一条来判断 `hasMore`——比再发一次 count 请求便宜。
+   *
+   * # 绝不带 `include_docs`
+   *
+   * 这一条是踩出来的。早先为了给宿主回 `size` 带了 `include_docs=true`，于是**每次列举
+   * 都把这一页所有分片的密文整份下载了一遍**——而宿主一处都不消费 `size`。远端有 1700
+   * 个对象时，那是每 5 分钟一两 MB 的无谓流量，且随历史线性增长。隐蔽之处在于：功能
+   * 完全正常，没有任何报错。
+   *
+   * 契约已把 `size` 改成可省（一念 `docs/11` §5.4.2），所以这里直接不报。
+   * `value.rev` / `value.deleted` 不需要 `include_docs` 就有，删除墓碑照旧能跳过。
    */
   async list(
     prefix: string,
     since: string | undefined,
     limit: number,
   ): Promise<{
-    objects: Array<{ key: string; size: number }>;
+    objects: Array<{ key: string }>;
     cursor?: string;
     hasMore: boolean;
   }> {
@@ -425,7 +446,6 @@ export class CouchClient {
       startkey: JSON.stringify(startKey),
       endkey: JSON.stringify(endKey),
       limit: String(limit + 1),
-      include_docs: "true",
     });
     const { status, json } = await this.request(
       "GET",
@@ -434,12 +454,12 @@ export class CouchClient {
     if (status !== 200) throw this.fail(status, json);
 
     const rows = ((json ?? {}) as AllDocsResult).rows ?? [];
-    const objects: Array<{ key: string; size: number }> = [];
+    const objects: Array<{ key: string }> = [];
     for (const row of rows) {
       const key = row.id ?? row.key;
       // 设计文档以 _ 开头，不是同步对象；已删除的墓碑也跳过
       if (!key || key.startsWith("_") || row.value?.deleted) continue;
-      objects.push({ key, size: row.doc?.s ?? decodedSize(row.doc?.b ?? "") });
+      objects.push({ key });
     }
 
     const hasMore = objects.length > limit;

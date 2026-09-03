@@ -691,8 +691,15 @@ export interface ReplicaListParams {
 
 export interface ReplicaObjectMeta {
   key: string;
-  /** 解码后字节数。 */
-  size: number;
+  /**
+   * 解码后字节数，**可省**。
+   *
+   * 宿主一处都不消费它（将来压实统计体积时才会用），而**绝不允许为了填上它去下载
+   * 对象内容**——本插件早期在 `_all_docs` 上带了 `include_docs=true` 只为算这个数，
+   * 于是宿主每轮列举都把远端所有分片的密文整份下载一遍：功能完全正常，只是流量与
+   * 历史长度成正比（契约 §5.4.2）。拿不到就省略。
+   */
+  size?: number;
 }
 
 export interface ReplicaListResult {
