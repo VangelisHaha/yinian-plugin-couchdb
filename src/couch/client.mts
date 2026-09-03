@@ -23,6 +23,7 @@
  * 显示给用户，也会进日志。
  */
 
+
 /** 连接配置，来自插件设置面板（secret 已由宿主解密注入）。 */
 export interface CouchConfig {
   endpoint: string;
@@ -200,10 +201,12 @@ export class CouchClient {
     timeoutMs: number,
     abort: AbortSignal,
   ): Promise<{ lastSeq: string; ids: string[] } | null> {
-    // heartbeat 让 CouchDB 周期性发一个空行，这样连接不会被中间的代理判成空闲掉线
+    // **不要同时给 heartbeat 和 timeout。** CouchDB 里 heartbeat 优先、timeout 被忽略，
+    // 于是连接永不超时——而我们靠「超时返回」来发心跳、也靠它在订阅出问题时自愈。
+    // 踩过一次：加了 heartbeat 之后 longpoll 一次都没返回过（连超时都没有），
+    // 实时订阅看起来建立成功、实际什么都收不到。
     const url = this.dbUrl(
-      `/_changes?feed=longpoll&since=${encodeURIComponent(since)}` +
-        `&timeout=${timeoutMs}&heartbeat=${Math.min(timeoutMs, 30_000)}`,
+      `/_changes?feed=longpoll&since=${encodeURIComponent(since)}&timeout=${timeoutMs}`,
     );
     let response: Response;
     try {
