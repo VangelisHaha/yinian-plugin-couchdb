@@ -97,6 +97,7 @@ async function loop(
   try {
     // 从「现在」开始，不从 0：从头拉一遍已经同步过的变更没有意义，而且第一轮会很大
     since = params.since ?? (await client.currentSeq());
+    logger.debug(`订阅已起，起点 seq=${since.slice(0, 24)}`);
   } catch (error) {
     logger.debug(`订阅起点取不到，退回轮询: ${describe(error)}`);
     subscriptions.delete(params.profileId);
@@ -109,6 +110,7 @@ async function loop(
       const batch = await client.waitForChanges(since, POLL_TIMEOUT_MS, signal);
       if (signal.aborted) break;
       failures = 0;
+
       if (batch === null) {
         // 这一轮没等到变更：发心跳让宿主知道订阅还活着
         replicaHeartbeat({ profileId: params.profileId, cursor: since });
@@ -116,6 +118,7 @@ async function loop(
       }
       since = batch.lastSeq;
       if (batch.ids.length > 0) {
+        logger.debug(`远端有 ${batch.ids.length} 个对象变更，通知宿主`);
         // **不报 keys**：CouchDB 的 doc id 是宿主的对象键，但一念的 list 才是权威，
         // 报不全比报错好（契约允许省略）。这里只说「有变化」。
         replicaChanged({ profileId: params.profileId, cursor: since });
