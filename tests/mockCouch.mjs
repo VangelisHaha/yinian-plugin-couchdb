@@ -29,6 +29,13 @@ export async function startMockCouch() {
   const databases = new Map();
   /** 每个库的变更序号，写一次 +1。真实 CouchDB 按文档算，这里够用。 */
   const seqs = new Map();
+  /**
+   * 收到过的请求（`METHOD path?query`），供测试断言**没有发出**某个参数。
+   *
+   * 「不该带 include_docs」这类约束只能这样验证：从响应上看不出区别，
+   * 而带上它的后果是每轮把所有密文都下载一遍（流量与历史成正比、功能却完全正常）。
+   */
+  const requests = [];
   const seq = (dbName) => seqs.get(dbName) ?? 0;
   const bumpSeq = (dbName) => seqs.set(dbName, seq(dbName) + 1);
 
@@ -46,6 +53,7 @@ export async function startMockCouch() {
     }
 
     const url = new URL(req.url ?? "/", "http://mock");
+    requests.push(`${req.method} ${url.pathname}${url.search}`);
     const segments = url.pathname.split("/").filter(Boolean).map(decodeURIComponent);
     const dbName = segments[0];
     const action = segments[1];
@@ -185,6 +193,7 @@ export async function startMockCouch() {
     user: USER,
     pass: PASS,
     databases,
+    requests,
     close: () => new Promise((resolve) => server.close(resolve)),
   };
 }

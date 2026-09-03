@@ -364,6 +364,12 @@ function checkContributes(manifest, where) {
         );
       }
     }
+    if (capabilities.watch === true) {
+      warn(
+        where,
+        "声明了 capabilities.watch 就必须每 heartbeatSeconds 至少发一次 replica.heartbeat（没变更时也要发）：宿主按 3 个周期判活，不发会被反复 unwatch + watch 重建，而界面上会显示「已退回轮询」",
+      );
+    }
   }
 
   for (const topic of contributes.hooks ?? []) {

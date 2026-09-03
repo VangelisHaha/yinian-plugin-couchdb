@@ -165,15 +165,37 @@ describe("replica.list", () => {
     );
   });
 
-  it("size 是解码后的字节数", async () => {
+  it("列举只回键、不下载内容", async () => {
+    // 这一条守着一个真实的、极隐蔽的缺陷：早先为了给宿主回 `size` 带了
+    // `include_docs=true`，于是**每次列举都把这一页所有分片的密文整份下载一遍**——
+    // 而宿主一处都不消费 size。远端 1700 个对象时是每 5 分钟一两 MB，且随历史线性
+    // 增长。从响应上看不出任何异常，所以只能断言「请求里没有这个参数」。
+    const before = couch.requests.length;
     const page = await replica.list({
       profileId: "p1",
       prefix: "journals/",
       limit: 100,
       config: cfg,
     });
-    // "hello" / "world" 都是 5 字节
-    assert.ok(page.objects.every((o) => o.size === 5), JSON.stringify(page.objects));
+
+    const listCalls = couch.requests
+      .slice(before)
+      .filter((line) => line.startsWith("GET") && line.includes("_all_docs"));
+    assert.ok(listCalls.length > 0, "应该真的发过范围列举请求");
+    for (const line of listCalls) {
+      assert.ok(
+        !line.includes("include_docs"),
+        `列举绝不能下载对象内容: ${line}`,
+      );
+    }
+
+    // 契约里 size 可省（一念 docs/11 §5.4.2），所以这里一个都不报
+    assert.ok(page.objects.length > 0);
+    assert.ok(
+      page.objects.every((o) => o.size === undefined),
+      JSON.stringify(page.objects),
+    );
+    assert.ok(page.objects.every((o) => typeof o.key === "string"));
   });
 
   it("翻到末尾时 hasMore 为 false", async () => {

@@ -62,4 +62,48 @@ describe("replica.watch", () => {
     const result = watch.watch({ profileId: "p1", config: cfg });
     assert.equal(result.watching, true);
   });
+
+  /**
+   * **没有变更的那一轮必须发心跳**，宿主拿它判活。
+   *
+   * 不发的后果是：宿主连续 3 个心跳周期收不到就判订阅已死，于是每轮同步都
+   * `unwatch` + `watch` 重建一次，并在设置页写「已退回轮询」——而订阅其实好着。
+   * 反过来说，这条测试**只证明代码路径通**：真实环境里若 longpoll 挂住不返回
+   * （见本模块顶部那个未解问题），心跳同样发不出来，那时宿主的判活是对的。
+   */
+  it("没有变更的那一轮要发心跳（宿主靠它判活）", async () => {
+    const frames = [];
+    const original = process.stdout.write.bind(process.stdout);
+    // 心跳是写到 stdout 的一帧 JSON-RPC notification，只能这样验
+    process.stdout.write = (chunk, ...rest) => {
+      frames.push(String(chunk));
+      return original(chunk, ...rest);
+    };
+
+    try {
+      watch.unwatch({ profileId: "p1" });
+      // 库里此刻没有比 currentSeq 更新的变更 → 走「本轮无变更」那条路
+      watch.watch({ profileId: "hb", config: cfg });
+
+      const deadline = Date.now() + 3000;
+      let seen = false;
+      while (Date.now() < deadline) {
+        if (frames.some((line) => line.includes('"replica.heartbeat"'))) {
+          seen = true;
+          break;
+        }
+        await new Promise((resolve) => setTimeout(resolve, 20));
+      }
+      assert.ok(seen, "没有变更时也必须发心跳，否则宿主会反复重建订阅");
+
+      const frame = JSON.parse(
+        frames.find((line) => line.includes('"replica.heartbeat"')).trim(),
+      );
+      assert.equal(frame.method, "replica.heartbeat");
+      assert.equal(frame.params.profileId, "hb", "要带上是哪份配置");
+    } finally {
+      process.stdout.write = original;
+      watch.unwatch({ profileId: "hb" });
+    }
+  });
 });
