@@ -1,7 +1,7 @@
 /**
- * 一念插件 SDK。
+ * 安时插件 SDK。
  *
- * 契约版本 **PROTOCOL_VERSION = 1**，对应一念仓库
+ * 契约版本 **PROTOCOL_VERSION = 1**，对应安时仓库
  * `docs/11-plugin-architecture.md`。契约的 source of truth 在那边，本 SDK 只是
  * 它的一个 TypeScript 实现——两者不一致时以文档为准。
  */

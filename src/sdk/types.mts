@@ -1,7 +1,7 @@
 /**
  * 扩展点的业务类型。
  *
- * 与一念仓库 `docs/11-plugin-architecture.md` §5（同步）、§7（设置面板）、
+ * 与安时仓库 `docs/11-plugin-architecture.md` §5（同步）、§7（设置面板）、
  * §8（出站事件）逐字段对应。字段名就是线格式，**不要在这里改驼峰/下划线**——
  * 宿主按线格式反序列化，改了名就是契约违规（`PLUGIN_CONTRACT_VIOLATION`）。
  */
@@ -42,7 +42,7 @@ export type ExternalPriority = "none" | "low" | "medium" | "high";
  * 两个容易踩的点：
  *
  * - `completedAt` **不知道就不要传**。传当前时间会让历史任务全部堆在同一秒，
- *   一念的「今日完成」会瞬间多出几百条（`nikou-screen` 踩过）。
+ *   安时的「今日完成」会瞬间多出几百条（`nikou-screen` 踩过）。
  * - `remoteUpdatedAt` 尽量给。宿主的字段级冲突判定靠它，缺了就只能保守处理。
  */
 export interface ExternalItem {
@@ -65,7 +65,7 @@ export interface ExternalItem {
   /**
    * 外部系统已经排好的排期段。
    *
-   * `dueAt` 回答「最晚什么时候完成」，这个回答「打算什么时候做」——一念把两件事
+   * `dueAt` 回答「最晚什么时候完成」，这个回答「打算什么时候做」——安时把两件事
    * 分开建模，日历上前者是 Deadline 细标记，后者才在时间轴上占一段。**只给 dueAt
    * 的任务在日历上永远只有一个标记。**
    *
@@ -82,7 +82,7 @@ export interface ExternalItem {
   /**
    * 想让用户在任务详情「来源」区看到的额外字段。
    *
-   * 一念的主模型只有所有待办系统都有的字段。你系统里独有的东西（空间、工作项类型、
+   * 安时的主模型只有所有待办系统都有的字段。你系统里独有的东西（空间、工作项类型、
    * 当前节点、负责人…）走这里：**你自己整理成「标签 + 值」，宿主原样展示**，
    * 核心不认识任何具体外部系统。
    *
@@ -117,7 +117,7 @@ export interface ExternalDetailField {
   kind?: "text" | "link";
 }
 
-/** 排期段状态，取值与一念的排期块一致。 */
+/** 排期段状态，取值与安时的排期块一致。 */
 export type ScheduleSlotStatus =
   | "planned"
   | "active"
@@ -125,7 +125,7 @@ export type ScheduleSlotStatus =
   | "unfinished"
   | "canceled";
 
-/** 外部系统里的一段排期，落成一念 Task 的一个排期块。 */
+/** 外部系统里的一段排期，落成安时 Task 的一个排期块。 */
 export interface ExternalScheduleSlot {
   /**
    * 这一段在外部系统里的**稳定**标识，同一条 `ExternalItem` 内唯一。
@@ -140,7 +140,7 @@ export interface ExternalScheduleSlot {
   /** RFC3339，必须晚于 `plannedStart`。 */
   plannedEnd: string;
   status?: ScheduleSlotStatus;
-  /** 段名（如「中台开发」）。一念的排期块不存名字，这里只进日志与诊断。 */
+  /** 段名（如「中台开发」）。安时的排期块不存名字，这里只进日志与诊断。 */
   title?: string;
 }
 
@@ -201,9 +201,9 @@ export interface PullResult {
 
 // ── Event 资源（pull-only，远端权威） ────────────────────────────────────
 //
-// 见一念仓库 docs/11-plugin-architecture.md §5.1.1。
+// 见安时仓库 docs/11-plugin-architecture.md §5.1.1。
 //
-// **宿主不会对 event 调 `sync.push`。** 外部日历一律落成只读日历，一念这侧改不了，
+// **宿主不会对 event 调 `sync.push`。** 外部日历一律落成只读日历，安时这侧改不了，
 // 也就没有冲突判定与待确认导入。理由：外部日历里的事情是外部已经发生的事实
 // （几号上市、会议改到几点），两边各改一半再 merge，结果和两边都不一致。
 
@@ -221,7 +221,7 @@ export type ExternalResponseStatus =
 /**
  * 外部系统里的一个日历容器。
  *
- * 宿主按 `(integrationId, externalId)` upsert 成一念的日历行，用户可以在日历侧栏
+ * 宿主按 `(integrationId, externalId)` upsert 成安时的日历行，用户可以在日历侧栏
  * 按来源逐个隐藏——**隐藏选择不会被同步覆盖**，远端改名只改名字。
  *
  * 刻意只有两个字段：pull-only 下让插件声明「这个日历可写」是空头承诺，
@@ -408,7 +408,7 @@ export interface NotificationDetail {
   /** 锚点是否已经过去。 */
   overdue?: boolean;
   /**
-   * `yinian://open/{task|event}/{id}`，唤起一念并打开该事项。
+   * `yinian://open/{task|event}/{id}`，唤起安时并打开该事项。
    *
    * **由宿主生成，不要自己拼 scheme。** 排期块给的是所属任务的链接（§8.2.1）。
    */
@@ -440,7 +440,7 @@ export interface NotifyResult {
 
 // ── 日期标记 ─────────────────────────────────────────────────────────────
 //
-// 见一念仓库 docs/11-plugin-architecture.md §8.3。
+// 见安时仓库 docs/11-plugin-architecture.md §8.3。
 //
 // 日期标记是挂在**某一天**上的公开日历知识：农历日序、二十四节气、传统与公历节日、
 // 法定假日与调休上班。它不属于任何用户，**不进宿主数据库、永不参与同步**——

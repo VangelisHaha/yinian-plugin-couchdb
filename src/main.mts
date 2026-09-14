@@ -33,7 +33,7 @@ start({
 
   handlers: {
     // 多端同步传输：四个必需方法。watch/unwatch 未实现——manifest 里
-    // capabilities.watch = false，宿主会退回轮询（一念 docs/14 §8.4 会在界面上标明时效）。
+    // capabilities.watch = false，宿主会退回轮询（安时 docs/14 §8.4 会在界面上标明时效）。
     "replica.put": replica.put,
     "replica.get": replica.get,
     "replica.list": replica.list,

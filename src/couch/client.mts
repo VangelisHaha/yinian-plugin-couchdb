@@ -6,9 +6,9 @@
  *
  * # 为什么不用 CouchDB 的复制协议 / PouchDB
  *
- * 一念只把 CouchDB 当「带范围查询的对象存储」用（一念仓库 `docs/14` §8.1）。用了复制
+ * 安时只把 CouchDB 当「带范围查询的对象存储」用（安时仓库 `docs/14` §8.1）。用了复制
  * 协议就绑死这一种后端，而 WebDAV 那条路得再写一套收敛逻辑——「换后端不动核心」当场作废。
- * 冲突判定 100% 在一念核心做字段级；这里一个业务判断都没有。
+ * 冲突判定 100% 在安时核心做字段级；这里一个业务判断都没有。
  *
  * # 不会产生 revision 冲突
  *
@@ -342,7 +342,7 @@ export class CouchClient {
    *
    * **409 conflict 视为成功**：对象是 immutable 的（journal 分片写进去就不再改），
    * 同 key 重复写只会发生在网络重试时，内容必然相同。契约要求 `put` 幂等
-   * （一念 `docs/11` §5.4.2），把它当失败会让宿主白白退避并烧断路器。
+   * （安时 `docs/11` §5.4.2），把它当失败会让宿主白白退避并烧断路器。
    */
   async bulkPut(objects: Array<{ key: string; bytes: string }>): Promise<string[]> {
     if (objects.length === 0) return [];
@@ -425,7 +425,7 @@ export class CouchClient {
    * 个对象时，那是每 5 分钟一两 MB 的无谓流量，且随历史线性增长。隐蔽之处在于：功能
    * 完全正常，没有任何报错。
    *
-   * 契约已把 `size` 改成可省（一念 `docs/11` §5.4.2），所以这里直接不报。
+   * 契约已把 `size` 改成可省（安时 `docs/11` §5.4.2），所以这里直接不报。
    * `value.rev` / `value.deleted` 不需要 `include_docs` 就有，删除墓碑照旧能跳过。
    */
   async list(

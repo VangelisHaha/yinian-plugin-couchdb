@@ -1,7 +1,7 @@
 {
   "name": "yinian-plugin-couchdb",
   "version": "0.4.0",
-  "description": "一念多端同步的 CouchDB 传输后端（replica 扩展点）",
+  "description": "安时多端同步的 CouchDB 传输后端（replica 扩展点）",
   "type": "module",
   "private": true,
   "engines": {

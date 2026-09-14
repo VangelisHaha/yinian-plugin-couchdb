@@ -2,7 +2,7 @@
 /**
  * 契约自检。零依赖，只用 Node 标准库。
  *
- * 它回答的是「这个包装进一念之后会不会被拒」，而不是「代码写得好不好」。检查三类：
+ * 它回答的是「这个包装进安时之后会不会被拒」，而不是「代码写得好不好」。检查三类：
  *
  * 1. **manifest**：必填字段、id / 版本格式、runtime.entry 存在、权限声明与
  *    contributes 的自洽性；
@@ -30,7 +30,7 @@ function resolveRoot() {
 
 const ROOT = resolveRoot();
 
-/** 与一念契约 §3.1 一致。 */
+/** 与安时契约 §3.1 一致。 */
 const ID_PATTERN = /^[a-z0-9][a-z0-9-]{1,62}$/;
 const SEMVER_PATTERN = /^\d+\.\d+\.\d+(?:-[0-9A-Za-z.-]+)?(?:\+[0-9A-Za-z.-]+)?$/;
 const FIELD_KEY_PATTERN = /^[a-zA-Z][a-zA-Z0-9_]*$/;
@@ -253,7 +253,7 @@ function checkContributes(manifest, where) {
         fail(where, `未知的 sync resource「${resource}」`);
       }
     }
-    // 纯 event 插件不会收到 sync.push，也不吃 task 字段门控（一念 docs/11 §5.1.1）
+    // 纯 event 插件不会收到 sync.push，也不吃 task 字段门控（安时 docs/11 §5.1.1）
     const eventOnly =
       resources.length > 0 && resources.every((item) => item === "event");
 
@@ -335,7 +335,7 @@ function checkContributes(manifest, where) {
     if (contributes.syncStrategy) {
       warn(
         where,
-        "replica 不需要 syncStrategy：多端同步的调度由一念核心掌握，与 interval / manual 无关",
+        "replica 不需要 syncStrategy：多端同步的调度由安时核心掌握，与 interval / manual 无关",
       );
     }
     for (const key of ["id", "name"]) {

@@ -6,7 +6,7 @@
  *
  * ## 为什么 watch 必须立即返回
  *
- * 宿主对每个 RPC 都有超时（`replica.watch` 是 10 秒，见一念 `docs/11` §4.5）。在
+ * 宿主对每个 RPC 都有超时（`replica.watch` 是 10 秒，见安时 `docs/11` §4.5）。在
  * handler 里等第一条变更会被超时杀掉，然后宿主重启插件、再 watch、再被杀——一个
  * 无限重启循环。所以这里只起一个后台循环就返回，变更靠 `replica.changed` 通知上报。
  *
@@ -18,7 +18,7 @@
  *
  * ## 断了怎么办
  *
- * **不用自己扛**：一念的轮询兜底一直留着（`docs/14` §8.4），订阅只是加速。所以这里
+ * **不用自己扛**：安时的轮询兜底一直留着（`docs/14` §8.4），订阅只是加速。所以这里
  * 出错就退避重试，退避上限也不必很短——最坏情况退化成轮询那个间隔，不会停摆。
  * 反过来说，**心跳必须照发**：宿主用它判活，不发的后果是订阅被反复重建。
  */
@@ -46,7 +46,7 @@ import { CouchClient, readConfig } from "../couch/client.mjs";
  * 有变更时 CouchDB 能立刻返回（已验证），所以订阅在「刚建立且远端已有新对象」时是
  * 工作的；卡住的是「挂起等待新变更」这一段。
  *
- * **这不影响正确性**：一念的轮询兜底一直留着（`docs/14` §8.4），订阅只是加速，
+ * **这不影响正确性**：安时的轮询兜底一直留着（`docs/14` §8.4），订阅只是加速，
  * 断了只会变慢不会丢数据。要更快可以把同步间隔调到 1 分钟。
  */
 const POLL_TIMEOUT_MS = 20_000;
@@ -160,7 +160,7 @@ async function loop(
       since = batch.lastSeq;
       if (batch.ids.length > 0) {
         logger.debug(`远端有 ${batch.ids.length} 个对象变更，通知宿主`);
-        // **不报 keys**：CouchDB 的 doc id 是宿主的对象键，但一念的 list 才是权威，
+        // **不报 keys**：CouchDB 的 doc id 是宿主的对象键，但安时的 list 才是权威，
         // 报不全比报错好（契约允许省略）。这里只说「有变化」。
         replicaChanged({ profileId: params.profileId, cursor: since });
       } else {

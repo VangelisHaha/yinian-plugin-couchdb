@@ -1,7 +1,7 @@
 /**
- * 一念插件协议的类型定义。
+ * 安时插件协议的类型定义。
  *
- * 契约的 source of truth 是一念仓库的 `docs/11-plugin-architecture.md`。
+ * 契约的 source of truth 是安时仓库的 `docs/11-plugin-architecture.md`。
  * 本文件对应 **PROTOCOL_VERSION = 1**；宿主在 `plugin.init` 里下发它实际使用的版本，
  * 与这里不一致时 SDK 会在 stderr 上警告（见 `runtime.mts`）。
  *
@@ -97,7 +97,7 @@ export interface PluginInitParams {
   /**
    * 只带 manifest 声明过的 scope。
    *
-   * **不是**一念的 Agent token，**不要落盘、不要打日志**。
+   * **不是**安时的 Agent token，**不要落盘、不要打日志**。
    */
   apiToken: string;
   /** 插件可以自由读写的目录。访问它不需要声明 fs 权限。 */

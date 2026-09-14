@@ -189,7 +189,7 @@ describe("replica.list", () => {
       );
     }
 
-    // 契约里 size 可省（一念 docs/11 §5.4.2），所以这里一个都不报
+    // 契约里 size 可省（安时 docs/11 §5.4.2），所以这里一个都不报
     assert.ok(page.objects.length > 0);
     assert.ok(
       page.objects.every((o) => o.size === undefined),
@@ -265,7 +265,7 @@ describe("配置与连接", () => {
   });
 
   it("库名不合 CouchDB 规则时报错", () => {
-    const result = config.validate({ config: { ...cfg, database: "Yinian-Sync" } });
+    const result = config.validate({ config: { ...cfg, database: "Nuncta-Sync" } });
     assert.equal(result.ok, false);
     assert.ok(result.errors.some((e) => e.field === "database"));
   });
